@@ -15,14 +15,14 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import (accuracy_score, precision_score, recall_score,
                              f1_score, confusion_matrix, classification_report)
 
+
 # ================================================
-# 1. DATA PREPARATION AND EMBEDDING GENERATION 
+# 1. DATA PREPARATION AND EMBEDDING GENERATION
 # ================================================
 
 def load_hansard_data(filepath=None):
     """Load parliamentary transcripts or generate representative synthetic data."""
     if filepath:
-        # Attempt to load - adjust columns as needed
         df = pd.read_csv(filepath)
     else:
         print(">> No file provided. Generating synthetic Hansard transcript data.")
@@ -80,7 +80,6 @@ def clean_and_tokenize(df):
     """Clean text and apply tokenization."""
     print("\n--- TEXT PREPROCESSING ---")
 
-    # Basic cleaning
     def clean_text(text):
         text = str(text).lower()
         text = re.sub(r'[^a-z\s]', ' ', text)
@@ -91,18 +90,24 @@ def clean_and_tokenize(df):
     print(f"  Cleaned {len(df)} documents")
     print(f"  Avg length: {df['clean_text'].str.len().mean():.0f} chars")
 
-    # Sub-word tokenization using HuggingFace tokenizer (BPE)
+    # Sub-word tokenization demo — store token counts only (not lists)
     try:
         from transformers import AutoTokenizer
         tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
-        df['tokens'] = df['clean_text'].apply(lambda x: tokenizer.tokenize(x))
-        df['token_count'] = df['tokens'].apply(len)
+        token_counts = df['clean_text'].apply(lambda x: len(tokenizer.tokenize(x)))
+        df['token_count'] = token_counts
         print(f"  BPE tokenization applied (bert-base-uncased)")
         print(f"  Avg tokens per doc: {df['token_count'].mean():.1f}")
-    except ImportError:
-        print("  [WARNING] transformers not installed. Using basic whitespace tokenization.")
-        df['tokens'] = df['clean_text'].str.split()
-        df['token_count'] = df['tokens'].apply(len)
+
+        # Show example tokenization
+        sample = df['clean_text'].iloc[0]
+        sample_tokens = tokenizer.tokenize(sample)
+        print(f"\n  Example tokenization:")
+        print(f"  Text: '{sample[:80]}...'")
+        print(f"  Tokens: {sample_tokens[:15]}...")
+    except Exception as e:
+        print(f"  [WARNING] Transformer tokenizer failed ({e}). Using whitespace tokenization.")
+        df['token_count'] = df['clean_text'].str.split().apply(len)
 
     print(f"\n  Tokenization justification:")
     print(f"  - BPE (Byte-Pair Encoding) handles out-of-vocabulary words by splitting into subwords")
@@ -122,8 +127,8 @@ def generate_embeddings(df):
         embeddings = model.encode(df['clean_text'].tolist(), show_progress_bar=True, batch_size=32)
         print(f"  Generated embeddings shape: {embeddings.shape}")
         print(f"  Using: all-MiniLM-L6-v2 (384-dim)")
-    except ImportError:
-        print("  [WARNING] sentence-transformers not installed. Using TF-IDF as fallback.")
+    except Exception as e:
+        print(f"  [WARNING] sentence-transformers failed ({e}). Using TF-IDF as fallback.")
         from sklearn.feature_extraction.text import TfidfVectorizer
         tfidf = TfidfVectorizer(max_features=384)
         embeddings = tfidf.fit_transform(df['clean_text']).toarray()
@@ -133,7 +138,7 @@ def generate_embeddings(df):
 
 
 # =====================================
-# 2. FINE-TUNING A TRANSFORMER MODEL 
+# 2. FINE-TUNING A TRANSFORMER MODEL
 # =====================================
 
 def train_sentiment_classifier(df, embeddings):
@@ -148,15 +153,14 @@ def train_sentiment_classifier(df, embeddings):
     X_train, X_test, y_train, y_test = train_test_split(
         embeddings, y, test_size=0.2, random_state=42, stratify=y)
 
-    # Try transformer-based classification, fallback to sklearn
-    model = None
     y_pred = None
+    y_test_eval = y_test
 
     try:
-        from transformers import (AutoModelForSequenceClassification, AutoTokenizer,
-                                  TrainingArguments, Trainer)
+        from transformers import AutoModelForSequenceClassification, AutoTokenizer
+        from transformers import TrainingArguments, Trainer
         import torch
-        from torch.utils.data import Dataset
+        from torch.utils.data import Dataset as TorchDataset
 
         print("  Using BERT fine-tuning for sentiment classification...")
 
@@ -164,10 +168,10 @@ def train_sentiment_classifier(df, embeddings):
         bert_model = AutoModelForSequenceClassification.from_pretrained(
             'bert-base-uncased', num_labels=3)
 
-        class SentimentDataset(Dataset):
-            def __init__(self, texts, labels, tokenizer, max_len=128):
-                self.encodings = tokenizer(texts, truncation=True, padding=True,
-                                           max_length=max_len, return_tensors='pt')
+        class SentimentDataset(TorchDataset):
+            def __init__(self, texts, labels, tok, max_len=128):
+                self.encodings = tok(texts, truncation=True, padding=True,
+                                     max_length=max_len, return_tensors='pt')
                 self.labels = torch.tensor(labels, dtype=torch.long)
 
             def __getitem__(self, idx):
@@ -178,29 +182,46 @@ def train_sentiment_classifier(df, embeddings):
             def __len__(self):
                 return len(self.labels)
 
-        train_texts = df.iloc[: len(y_train)]['clean_text'].tolist()
-        test_texts = df.iloc[len(y_train):]['clean_text'].tolist()
+        # Split texts matching the embedding split
+        all_texts = df['clean_text'].tolist()
+        np.random.seed(42)
+        indices = np.arange(len(df))
+        train_idx, test_idx = train_test_split(
+            indices, test_size=0.2, random_state=42, stratify=y)
 
-        # Use smaller subset for faster training
-        train_dataset = SentimentDataset(train_texts[:200], y_train[:200], tokenizer)
-        test_dataset = SentimentDataset(test_texts[:100], y_test[:100], tokenizer)
+        train_texts = [all_texts[i] for i in train_idx[:200]]
+        test_texts = [all_texts[i] for i in test_idx[:100]]
+        train_labels = y[train_idx[:200]]
+        test_labels = y[test_idx[:100]]
+
+        train_dataset = SentimentDataset(train_texts, train_labels, tokenizer)
+        test_dataset = SentimentDataset(test_texts, test_labels, tokenizer)
 
         training_args = TrainingArguments(
-            output_dir='./results', num_train_epochs=2, per_device_train_batch_size=16,
-            per_device_eval_batch_size=16, logging_steps=50, save_strategy='no',
-            report_to='none'
+            output_dir='./results',
+            num_train_epochs=2,
+            per_device_train_batch_size=16,
+            per_device_eval_batch_size=16,
+            logging_steps=50,
+            save_strategy='no',
+            report_to='none',
         )
 
-        trainer = Trainer(model=bert_model, args=training_args,
-                         train_dataset=train_dataset, eval_dataset=test_dataset)
+        trainer = Trainer(
+            model=bert_model,
+            args=training_args,
+            train_dataset=train_dataset,
+            eval_dataset=test_dataset,
+        )
         trainer.train()
 
         predictions = trainer.predict(test_dataset)
         y_pred = np.argmax(predictions.predictions, axis=1)
-        y_test_eval = y_test[:100]
+        y_test_eval = test_labels
 
-    except (ImportError, Exception) as e:
-        print(f"  [INFO] BERT fine-tuning unavailable ({e}). Using gradient boosting on embeddings.")
+    except Exception as e:
+        print(f"  [INFO] BERT fine-tuning unavailable ({e}).")
+        print(f"  Using gradient boosting on embeddings instead.")
         from sklearn.ensemble import GradientBoostingClassifier
         model = GradientBoostingClassifier(n_estimators=100, random_state=42)
         model.fit(X_train, y_train)
@@ -218,7 +239,6 @@ def train_sentiment_classifier(df, embeddings):
     print(f"  Recall:    {rec:.4f}")
     print(f"  F1-score:  {f1:.4f}")
 
-    # Confusion matrix
     cm = confusion_matrix(y_test_eval, y_pred)
     plt.figure(figsize=(8, 6))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Greens',
@@ -236,42 +256,41 @@ def train_sentiment_classifier(df, embeddings):
 
 
 # =======================
-# 3. RAG IMPLEMENTATION 
+# 3. RAG IMPLEMENTATION
 # =======================
 
 def build_rag_pipeline(df, embeddings):
     """Build Retrieval-Augmented Generation pipeline."""
     print("\n--- RAG PIPELINE ---")
 
-    # Vector store using FAISS
-    try:
-        import faiss
-        print("  Using FAISS for vector search")
-    except ImportError:
-        print("  [WARNING] FAISS not installed. Using sklearn NearestNeighbors as fallback.")
-
-    # Build index
     embedding_dim = embeddings.shape[1]
+    use_faiss = False
 
     try:
         import faiss
         index = faiss.IndexFlatL2(embedding_dim)
         index.add(embeddings.astype(np.float32))
         use_faiss = True
-    except ImportError:
+        print("  Using FAISS for vector search")
+    except Exception:
         from sklearn.neighbors import NearestNeighbors
         nn = NearestNeighbors(n_neighbors=5, metric='cosine')
         nn.fit(embeddings)
-        use_faiss = False
+        print("  Using sklearn NearestNeighbors for vector search (FAISS fallback)")
 
-    # Query function
+    # Store embedding model once to avoid reloading
+    embed_model = None
+    try:
+        from sentence_transformers import SentenceTransformer
+        embed_model = SentenceTransformer('all-MiniLM-L6-v2')
+    except Exception:
+        pass
+
     def retrieve(query, k=5):
         """Retrieve top-k relevant documents for a query."""
-        try:
-            from sentence_transformers import SentenceTransformer
-            model = SentenceTransformer('all-MiniLM-L6-v2')
-            q_emb = model.encode([query]).astype(np.float32)
-        except ImportError:
+        if embed_model is not None:
+            q_emb = embed_model.encode([query]).astype(np.float32)
+        else:
             from sklearn.feature_extraction.text import TfidfVectorizer
             tfidf = TfidfVectorizer(max_features=embedding_dim)
             tfidf.fit(df['clean_text'])
@@ -291,12 +310,23 @@ def build_rag_pipeline(df, embeddings):
         context = "\n".join(context_docs['text'].tolist())
 
         try:
-            from transformers import pipeline
-            generator = pipeline('text-generation', model='gpt2', max_new_tokens=100)
+            from transformers import pipeline as hf_pipeline
+            generator = hf_pipeline(
+                'text-generation',
+                model='gpt2',
+                max_new_tokens=100,
+                pad_token_id=50256,  # Fix the padding token warning
+            )
             prompt = f"Based on parliamentary records:\n{context}\n\nQuestion: {query}\nAnswer:"
-            response = generator(prompt, max_new_tokens=100, do_sample=True, temperature=0.7)
+            response = generator(
+                prompt,
+                max_new_tokens=100,
+                do_sample=True,
+                temperature=0.7,
+                pad_token_id=50256,
+            )
             return response[0]['generated_text']
-        except (ImportError, Exception):
+        except Exception:
             # Rule-based fallback
             sentiments = context_docs['sentiment'].value_counts()
             topics = context_docs['topic'].value_counts()
@@ -324,7 +354,6 @@ def build_rag_pipeline(df, embeddings):
         print(f"  Sentiments: {retrieved['sentiment'].value_counts().to_dict()}")
         print(f"  A: {answer[:300]}...")
 
-    # Evaluate relevance
     print("\n  --- Response Evaluation ---")
     print("""
     Relevance Assessment:
@@ -338,7 +367,7 @@ def build_rag_pipeline(df, embeddings):
 
 
 # =======================================
-# 4. ETHICS, RISK, AND RESPONSIBLE AI 
+# 4. ETHICS, RISK, AND RESPONSIBLE AI
 # =======================================
 
 def ethics_discussion():
@@ -349,8 +378,8 @@ def ethics_discussion():
 
     discussion = """
     1. BIAS IN DATASETS
-    ─────────────────────
-    Accident Data: South African traffic accident data suffers from reporting bias —
+    ---------------------
+    Accident Data: South African traffic accident data suffers from reporting bias -
     accidents in rural areas and informal settlements are significantly under-reported.
     This creates models that disproportionately allocate resources to urban areas.
     Provincial disparities in data collection quality further compound this issue.
@@ -361,10 +390,10 @@ def ethics_discussion():
     contributions in other official South African languages.
 
     2. TRANSPARENCY AND EXPLAINABILITY
-    ────────────────────────────────────
+    ------------------------------------
     Ensemble Models: Random Forest and XGBoost are relatively interpretable through
     feature importance scores. However, the interaction effects between features
-    (e.g., road condition × time of day) are opaque. SHAP values can improve
+    (e.g., road condition x time of day) are opaque. SHAP values can improve
     local explainability but add computational cost.
 
     LLMs: Transformer models are fundamentally opaque. Attention weights provide
@@ -372,7 +401,7 @@ def ethics_discussion():
     transparency by grounding responses in retrievable source documents.
 
     3. RISKS OF HARMFUL/MISLEADING CONTENT
-    ─────────────────────────────────────────
+    -----------------------------------------
     - Accident prediction models may create false confidence in safety assessments,
       leading to reduced vigilance in areas predicted as "low risk."
     - LLM-generated summaries of parliamentary debates may misrepresent positions,
@@ -380,7 +409,7 @@ def ethics_discussion():
     - Generated content could be weaponized for political misinformation.
 
     4. MITIGATION STRATEGIES
-    ──────────────────────────
+    --------------------------
     - Prompt Engineering: Constrain LLM outputs to factual summaries with citations.
     - Content Filtering: Implement toxicity and factuality checks on generated text.
     - Human-in-the-Loop: All model recommendations (both accident interventions and
@@ -389,14 +418,14 @@ def ethics_discussion():
     - Regular Auditing: Periodic bias audits across demographic and geographic groups.
 
     5. RESPONSIBLE AI IN THE SOUTH AFRICAN CONTEXT
-    ─────────────────────────────────────────────────
+    -------------------------------------------------
     - The Protection of Personal Information Act (POPIA) requires that automated
       decision-making systems be transparent and contestable.
     - South Africa's diverse linguistic landscape (11 official languages) means
       English-only models exclude significant portions of the population.
     - Historical inequalities mean that biased models risk perpetuating apartheid-era
       resource allocation patterns.
-    - The National Development Plan 2030 emphasizes inclusive technology deployment —
+    - The National Development Plan 2030 emphasizes inclusive technology deployment -
       AI systems must demonstrably serve all communities equitably.
     - Deployment should prioritize provinces with highest accident rates while ensuring
       rural communities are not systematically disadvantaged by data gaps.
@@ -410,25 +439,16 @@ def run_component_b(filepath=None):
     print("COMPONENT B: LLM and RAG System")
     print("=" * 60)
 
-    # 1. Data Preparation
     df = load_hansard_data(filepath)
     df = clean_and_tokenize(df)
-
-    # 2. Embeddings
     embeddings = generate_embeddings(df)
 
-    # Save preprocessed data
     df[['text', 'clean_text', 'topic', 'year', 'sentiment']].to_csv(
         'data/preprocessed_hansard.csv', index=False)
     print("\nPreprocessed data saved to data/preprocessed_hansard.csv")
 
-    # 3. Sentiment Classification
     results = train_sentiment_classifier(df, embeddings)
-
-    # 4. RAG Pipeline
     retrieve, generate = build_rag_pipeline(df, embeddings)
-
-    # 5. Ethics Discussion
     ethics_discussion()
 
     return df, results
