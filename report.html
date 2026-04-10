@@ -1,90 +1,231 @@
 <html>
-<head>
-<title>ML Systems Project Report</title>
-<style>
-body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; line-height: 1.6; font-size: 12pt; }
-h1 { font-size: 18pt; border-bottom: 2px solid #333; padding-bottom: 5px; }
-h2 { font-size: 14pt; color: #333; margin-top: 25px; }
-h3 { font-size: 12pt; color: #555; }
-table { border-collapse: collapse; width: 100%; margin: 10px 0; }
-th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; font-size: 11pt; }
-th { background: #f0f0f0; }
-p, li { font-size: 12pt; }
-</style>
-</head>
-<body>
+  <head>
+    <title>ML Systems Project Report</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 40px auto;
+        padding: 20px;
+        line-height: 1.6;
+        font-size: 12pt;
+      }
+      h1 {
+        font-size: 18pt;
+        border-bottom: 2px solid #333;
+        padding-bottom: 5px;
+      }
+      h2 {
+        font-size: 14pt;
+        color: #333;
+        margin-top: 25px;
+      }
+      h3 {
+        font-size: 12pt;
+        color: #555;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 10px 0;
+      }
+      th,
+      td {
+        border: 1px solid #ccc;
+        padding: 6px 10px;
+        text-align: left;
+        font-size: 11pt;
+      }
+      th {
+        background: #f0f0f0;
+      }
+      p,
+      li {
+        font-size: 12pt;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Integrated Machine Learning Systems Project</h1>
+    <p>
+      <strong>Author:</strong> Nobuhle Ngobese |
+      <strong>Student Number:</strong> 202413385<br />
+      <strong>Module:</strong> Machine Learning 700
+    </p>
 
-<h1>Integrated Machine Learning Systems Project</h1>
-<p><strong>Author:</strong> Nobuhle Ngobese | <strong>Student Number:</strong> 202413385<br>
-<strong>Module:</strong> Machine Learning | <strong>Date:</strong> 2025</p>
+    <h2>1. Introduction</h2>
+    <p>
+      This report presents two integrated machine learning systems using South
+      African datasets. <strong>Component A</strong> combines ensemble learning
+      (Random Forest, XGBoost) with Q-learning reinforcement learning for
+      traffic accident severity prediction and adaptive safety interventions.
+      <strong>Component B</strong> implements a transformer-based NLP pipeline
+      for sentiment classification of Parliamentary Hansard Transcripts,
+      combined with a Retrieval-Augmented Generation (RAG) system for
+      policy-focused question answering.
+    </p>
 
-<h2>1. Introduction</h2>
-<p>This report presents two integrated machine learning systems using South African datasets. <strong>Component A</strong> combines ensemble learning (Random Forest, XGBoost) with Q-learning reinforcement learning for traffic accident severity prediction and adaptive safety interventions. <strong>Component B</strong> implements a transformer-based NLP pipeline for sentiment classification of Parliamentary Hansard Transcripts, combined with a Retrieval-Augmented Generation (RAG) system for policy-focused question answering.</p>
+    <h2>2. Methodology</h2>
 
-<h2>2. Methodology</h2>
+    <h3>2.1 Component A: Hybrid RL and Ensemble Learning</h3>
+    <p>
+      <strong>Data Preprocessing:</strong> Missing values were imputed using
+      median (numeric) and mode (categorical). Categorical variables were
+      label-encoded. Outliers were treated using IQR-based clipping.
+    </p>
+    <p>
+      <strong>Ensemble Learning:</strong> Random Forest (200 trees,
+      max_depth=10) and XGBoost (200 estimators, learning_rate=0.1) were trained
+      on an 80/20 stratified split and evaluated using Accuracy, Precision,
+      Recall, and F1-score.
+    </p>
+    <p>
+      <strong>Reinforcement Learning:</strong> An MDP with 12 states (4 road
+      conditions x 3 frequency levels) and 4 actions was defined. A Q-learning
+      agent trained over 2000 episodes with decaying epsilon-greedy exploration
+      (1.0 to 0.01).
+    </p>
+    <p>
+      <strong>Integration:</strong> Ensemble predictions identify high-risk
+      scenarios; the RL policy recommends optimal interventions per state.
+    </p>
 
-<h3>2.1 Component A: Hybrid RL and Ensemble Learning</h3>
-<p><strong>Data Preprocessing:</strong> Missing values were imputed using median (numeric) and mode (categorical). Categorical variables were label-encoded. Outliers were treated using IQR-based clipping.</p>
-<p><strong>Ensemble Learning:</strong> Random Forest (200 trees, max_depth=10) and XGBoost (200 estimators, learning_rate=0.1) were trained on an 80/20 stratified split and evaluated using Accuracy, Precision, Recall, and F1-score.</p>
-<p><strong>Reinforcement Learning:</strong> An MDP with 12 states (4 road conditions x 3 frequency levels) and 4 actions was defined. A Q-learning agent trained over 2000 episodes with decaying epsilon-greedy exploration (1.0 to 0.01).</p>
-<p><strong>Integration:</strong> Ensemble predictions identify high-risk scenarios; the RL policy recommends optimal interventions per state.</p>
+    <h3>2.2 Component B: LLM and RAG System</h3>
+    <p>
+      <strong>Preprocessing:</strong> Text was cleaned and tokenized using BPE.
+      Embeddings were generated using TF-IDF (384 dimensions).
+    </p>
+    <p>
+      <strong>Sentiment Classification:</strong> A Gradient Boosting classifier
+      was trained on embeddings for 3-class sentiment classification
+      (positive/negative/neutral).
+    </p>
+    <p>
+      <strong>RAG Pipeline:</strong> FAISS vector index retrieves top-5
+      semantically similar documents per query. Answers are generated grounded
+      in retrieved context.
+    </p>
 
-<h3>2.2 Component B: LLM and RAG System</h3>
-<p><strong>Preprocessing:</strong> Text was cleaned and tokenized using BPE. Embeddings were generated using TF-IDF (384 dimensions).</p>
-<p><strong>Sentiment Classification:</strong> A Gradient Boosting classifier was trained on embeddings for 3-class sentiment classification (positive/negative/neutral).</p>
-<p><strong>RAG Pipeline:</strong> FAISS vector index retrieves top-5 semantically similar documents per query. Answers are generated grounded in retrieved context.</p>
+    <h2>3. Results and Evaluation</h2>
 
-<h2>3. Results and Evaluation</h2>
+    <h3>3.1 Ensemble Model Performance</h3>
+    <table>
+      <tr>
+        <th>Model</th>
+        <th>Accuracy</th>
+        <th>Precision</th>
+        <th>Recall</th>
+        <th>F1-Score</th>
+      </tr>
+      <tr>
+        <td>Random Forest</td>
+        <td>~0.55</td>
+        <td>~0.54</td>
+        <td>~0.55</td>
+        <td>~0.54</td>
+      </tr>
+      <tr>
+        <td>XGBoost</td>
+        <td>~0.56</td>
+        <td>~0.55</td>
+        <td>~0.56</td>
+        <td>~0.55</td>
+      </tr>
+    </table>
+    <p>
+      Both models show comparable performance. Feature importance analysis
+      identifies AlcoholInvolved, SpeedLimit, and RoadCondition as strongest
+      predictors. The "Minor" class is predicted most accurately, while "Fatal"
+      is harder due to class imbalance.
+    </p>
 
-<h3>3.1 Ensemble Model Performance</h3>
-<table>
-<tr><th>Model</th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1-Score</th></tr>
-<tr><td>Random Forest</td><td>~0.55</td><td>~0.54</td><td>~0.55</td><td>~0.54</td></tr>
-<tr><td>XGBoost</td><td>~0.56</td><td>~0.55</td><td>~0.56</td><td>~0.55</td></tr>
-</table>
-<p>Both models show comparable performance. Feature importance analysis identifies AlcoholInvolved, SpeedLimit, and RoadCondition as strongest predictors. The "Minor" class is predicted most accurately, while "Fatal" is harder due to class imbalance.</p>
+    <h3>3.2 RL Results</h3>
+    <p>
+      The Q-learning agent converges within ~1000 episodes. The learned policy
+      recommends Infrastructure Upgrade for hazardous roads (Icy, Gravel) and
+      Increase Enforcement for high-frequency accident areas.
+    </p>
 
-<h3>3.2 RL Results</h3>
-<p>The Q-learning agent converges within ~1000 episodes. The learned policy recommends Infrastructure Upgrade for hazardous roads (Icy, Gravel) and Increase Enforcement for high-frequency accident areas.</p>
+    <h3>3.3 Sentiment Classification</h3>
+    <p>
+      The classifier achieves strong performance on negative sentiment (clear
+      linguistic markers) and moderate performance on neutral sentiment. Most
+      misclassifications occur between neutral and positive classes.
+    </p>
 
-<h3>3.3 Sentiment Classification</h3>
-<p>The classifier achieves strong performance on negative sentiment (clear linguistic markers) and moderate performance on neutral sentiment. Most misclassifications occur between neutral and positive classes.</p>
+    <h3>3.4 RAG Pipeline</h3>
+    <p>
+      Retrieved documents are semantically relevant to queries. Answers are
+      grounded in retrieved context with source excerpts displayed for
+      verification.
+    </p>
 
-<h3>3.4 RAG Pipeline</h3>
-<p>Retrieved documents are semantically relevant to queries. Answers are grounded in retrieved context with source excerpts displayed for verification.</p>
+    <h2>4. Discussion and Ethical Considerations</h2>
 
-<h2>4. Discussion and Ethical Considerations</h2>
+    <p>
+      <strong>Bias:</strong> Accident data suffers from rural under-reporting,
+      creating geographic bias. Hansard transcripts reflect only parliamentary
+      voices in primarily English, excluding other official languages.
+    </p>
 
-<p><strong>Bias:</strong> Accident data suffers from rural under-reporting, creating geographic bias. Hansard transcripts reflect only parliamentary voices in primarily English, excluding other official languages.</p>
+    <p>
+      <strong>Transparency:</strong> Ensemble models provide feature importance
+      but lack local explanations. The RAG pipeline improves transparency by
+      providing source documents alongside answers.
+    </p>
 
-<p><strong>Transparency:</strong> Ensemble models provide feature importance but lack local explanations. The RAG pipeline improves transparency by providing source documents alongside answers.</p>
+    <p>
+      <strong>Risks:</strong> False confidence in "low risk" predictions could
+      reduce safety vigilance. LLM-generated summaries may misrepresent
+      political positions.
+    </p>
 
-<p><strong>Risks:</strong> False confidence in "low risk" predictions could reduce safety vigilance. LLM-generated summaries may misrepresent political positions.</p>
+    <p>
+      <strong>Mitigation:</strong> Human-in-the-loop review, confidence
+      thresholds, content filtering, prompt engineering, and regular bias audits
+      across demographics and geography.
+    </p>
 
-<p><strong>Mitigation:</strong> Human-in-the-loop review, confidence thresholds, content filtering, prompt engineering, and regular bias audits across demographics and geography.</p>
+    <p>
+      <strong>South African Context:</strong> POPIA requires transparent,
+      contestable automated decisions. With 11 official languages, English-only
+      models exclude significant populations. Models must not perpetuate
+      apartheid-era resource allocation patterns. The NDP 2030 emphasises
+      inclusive technology serving all communities equitably.
+    </p>
 
-<p><strong>South African Context:</strong> POPIA requires transparent, contestable automated decisions. With 11 official languages, English-only models exclude significant populations. Models must not perpetuate apartheid-era resource allocation patterns. The NDP 2030 emphasises inclusive technology serving all communities equitably.</p>
+    <h2>5. Conclusion and Recommendations</h2>
+    <p>
+      This project demonstrated the integration of ensemble learning,
+      reinforcement learning, and NLP into functional intelligent systems. Key
+      recommendations:
+    </p>
+    <ul>
+      <li>Deploy as decision-support tools with mandatory human oversight</li>
+      <li>Invest in multilingual data collection to reduce language bias</li>
+      <li>Conduct regular bias audits before and after deployment</li>
+      <li>Ensure POPIA compliance in all automated decision processes</li>
+      <li>
+        Implement SHAP explanations for ensemble models to improve stakeholder
+        trust
+      </li>
+    </ul>
 
-<h2>5. Conclusion and Recommendations</h2>
-<p>This project demonstrated the integration of ensemble learning, reinforcement learning, and NLP into functional intelligent systems. Key recommendations:</p>
-<ul>
-<li>Deploy as decision-support tools with mandatory human oversight</li>
-<li>Invest in multilingual data collection to reduce language bias</li>
-<li>Conduct regular bias audits before and after deployment</li>
-<li>Ensure POPIA compliance in all automated decision processes</li>
-<li>Implement SHAP explanations for ensemble models to improve stakeholder trust</li>
-</ul>
-
-<h3>References</h3>
-<p style="font-size:10pt;">
-Breiman, L. (2001). Random Forests. <em>Machine Learning</em>, 45(1), 5-32.<br>
-Chen, T. & Guestrin, C. (2016). XGBoost: A Scalable Tree Boosting System. <em>KDD</em>.<br>
-Devlin, J. et al. (2019). BERT: Pre-training of Deep Bidirectional Transformers. <em>NAACL</em>.<br>
-Lewis, P. et al. (2020). Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks. <em>NeurIPS</em>.<br>
-Sutton, R.S. & Barto, A.G. (2018). <em>Reinforcement Learning: An Introduction</em>. MIT Press.<br>
-South African Government. Protection of Personal Information Act (POPIA), 2013.<br>
-National Planning Commission. National Development Plan 2030.
-</p>
-
-</body>
+    <h3>References</h3>
+    <p style="font-size: 10pt">
+      Breiman, L. (2001). Random Forests. <em>Machine Learning</em>, 45(1),
+      5-32.<br />
+      Chen, T. & Guestrin, C. (2016). XGBoost: A Scalable Tree Boosting System.
+      <em>KDD</em>.<br />
+      Devlin, J. et al. (2019). BERT: Pre-training of Deep Bidirectional
+      Transformers. <em>NAACL</em>.<br />
+      Lewis, P. et al. (2020). Retrieval-Augmented Generation for
+      Knowledge-Intensive NLP Tasks. <em>NeurIPS</em>.<br />
+      Sutton, R.S. & Barto, A.G. (2018).
+      <em>Reinforcement Learning: An Introduction</em>. MIT Press.<br />
+      South African Government. Protection of Personal Information Act (POPIA),
+      2013.<br />
+      National Planning Commission. National Development Plan 2030.
+    </p>
+  </body>
 </html>
