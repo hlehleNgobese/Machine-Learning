@@ -15,9 +15,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import (accuracy_score, precision_score, recall_score,
                              f1_score, confusion_matrix, classification_report)
 
-# ============================================================
-# 1. DATA PREPARATION AND EMBEDDING GENERATION (10 Marks)
-# ============================================================
+# ================================================
+# 1. DATA PREPARATION AND EMBEDDING GENERATION 
+# ================================================
 
 def load_hansard_data(filepath=None):
     """Load parliamentary transcripts or generate representative synthetic data."""
@@ -132,9 +132,9 @@ def generate_embeddings(df):
     return embeddings
 
 
-# ============================================================
-# 2. FINE-TUNING A TRANSFORMER MODEL (10 Marks)
-# ============================================================
+# =====================================
+# 2. FINE-TUNING A TRANSFORMER MODEL 
+# =====================================
 
 def train_sentiment_classifier(df, embeddings):
     """Fine-tune/train a sentiment classifier."""
@@ -235,9 +235,9 @@ def train_sentiment_classifier(df, embeddings):
     return {'Accuracy': acc, 'Precision': prec, 'Recall': rec, 'F1': f1}
 
 
-# ============================================================
-# 3. RAG IMPLEMENTATION (10 Marks)
-# ============================================================
+# =======================
+# 3. RAG IMPLEMENTATION 
+# =======================
 
 def build_rag_pipeline(df, embeddings):
     """Build Retrieval-Augmented Generation pipeline."""
@@ -337,9 +337,9 @@ def build_rag_pipeline(df, embeddings):
     return retrieve, generate_answer
 
 
-# ============================================================
-# 4. ETHICS, RISK, AND RESPONSIBLE AI (20 Marks)
-# ============================================================
+# =======================================
+# 4. ETHICS, RISK, AND RESPONSIBLE AI 
+# =======================================
 
 def ethics_discussion():
     """Critical discussion on ethics, risk, and responsible AI."""
@@ -403,10 +403,6 @@ def ethics_discussion():
     """
     print(discussion)
 
-
-# ============================================================
-# MAIN EXECUTION
-# ============================================================
 
 def run_component_b(filepath=None):
     """Execute full Component B pipeline."""

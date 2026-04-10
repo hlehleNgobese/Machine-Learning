@@ -17,9 +17,9 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-# ============================================================
-# 1. DATA PREPARATION AND PREPROCESSING (10 Marks)
-# ============================================================
+# =======================================
+# 1. DATA PREPARATION AND PREPROCESSING 
+# =======================================
 
 def load_and_prepare_data(filepath=None):
     """Load dataset or generate representative synthetic data."""
@@ -121,9 +121,9 @@ def preprocess(df):
     return df, label_encoders
 
 
-# ============================================================
-# 2. ENSEMBLE LEARNING FOR ACCIDENT PREDICTION (15 Marks)
-# ============================================================
+# ===============================================
+# 2. ENSEMBLE LEARNING FOR ACCIDENT PREDICTION 
+# ===============================================
 
 def train_ensemble_models(df):
     """Train Random Forest and XGBoost, evaluate and compare."""
@@ -204,9 +204,9 @@ def train_ensemble_models(df):
     return results, X_test, y_test
 
 
-# ============================================================
-# 3. REINFORCEMENT LEARNING FOR ACCIDENT PREVENTION (15 Marks)
-# ============================================================
+# ===================================================
+# 3. REINFORCEMENT LEARNING FOR ACCIDENT PREVENTION 
+# ===================================================
 
 class AccidentPreventionMDP:
     """
@@ -312,9 +312,9 @@ def train_q_learning(episodes=2000, alpha=0.1, gamma=0.95,
     return Q, mdp, rewards_per_episode
 
 
-# ============================================================
-# 4. SYSTEM INTEGRATION AND EVALUATION (10 Marks)
-# ============================================================
+# =======================================
+# 4. SYSTEM INTEGRATION AND EVALUATION 
+# =======================================
 
 def integrate_system(ensemble_results, Q, mdp, df):
     """Integrate ensemble predictions with RL intervention strategy."""
@@ -354,10 +354,6 @@ def integrate_system(ensemble_results, Q, mdp, df):
     - Regular model retraining is needed as conditions evolve.
     """)
 
-
-# ============================================================
-# MAIN EXECUTION
-# ============================================================
 
 def run_component_a(filepath=None):
     """Execute full Component A pipeline."""
