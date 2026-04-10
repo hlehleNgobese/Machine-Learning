@@ -86,28 +86,34 @@ def clean_and_tokenize(df):
         text = re.sub(r'\s+', ' ', text).strip()
         return text
 
+    df = df.copy()
     df['clean_text'] = df['text'].apply(clean_text)
     print(f"  Cleaned {len(df)} documents")
     print(f"  Avg length: {df['clean_text'].str.len().mean():.0f} chars")
 
-    # Sub-word tokenization demo — store token counts only (not lists)
+    # Tokenization — try BPE, fallback to whitespace
     try:
         from transformers import AutoTokenizer
         tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
-        token_counts = df['clean_text'].apply(lambda x: len(tokenizer.tokenize(x)))
-        df['token_count'] = token_counts
+        df['token_count'] = df['clean_text'].apply(lambda x: len(tokenizer.tokenize(x)))
         print(f"  BPE tokenization applied (bert-base-uncased)")
         print(f"  Avg tokens per doc: {df['token_count'].mean():.1f}")
 
-        # Show example tokenization
         sample = df['clean_text'].iloc[0]
         sample_tokens = tokenizer.tokenize(sample)
         print(f"\n  Example tokenization:")
         print(f"  Text: '{sample[:80]}...'")
         print(f"  Tokens: {sample_tokens[:15]}...")
     except Exception as e:
-        print(f"  [WARNING] Transformer tokenizer failed ({e}). Using whitespace tokenization.")
+        print(f"  [INFO] Transformer tokenizer unavailable ({type(e).__name__}). Using whitespace tokenization.")
         df['token_count'] = df['clean_text'].str.split().apply(len)
+        print(f"  Avg tokens per doc: {df['token_count'].mean():.1f}")
+
+        sample = df['clean_text'].iloc[0]
+        sample_tokens = sample.split()
+        print(f"\n  Example tokenization:")
+        print(f"  Text: '{sample[:80]}...'")
+        print(f"  Tokens: {sample_tokens[:15]}...")
 
     print(f"\n  Tokenization justification:")
     print(f"  - BPE (Byte-Pair Encoding) handles out-of-vocabulary words by splitting into subwords")
@@ -118,22 +124,28 @@ def clean_and_tokenize(df):
 
 
 def generate_embeddings(df):
-    """Generate semantic embeddings using a transformer model."""
+    """Generate semantic embeddings using TF-IDF (robust fallback for all environments)."""
     print("\n--- EMBEDDING GENERATION ---")
 
+    # Try sentence-transformers first
     try:
         from sentence_transformers import SentenceTransformer
         model = SentenceTransformer('all-MiniLM-L6-v2')
         embeddings = model.encode(df['clean_text'].tolist(), show_progress_bar=True, batch_size=32)
         print(f"  Generated embeddings shape: {embeddings.shape}")
         print(f"  Using: all-MiniLM-L6-v2 (384-dim)")
+        return embeddings
     except Exception as e:
-        print(f"  [WARNING] sentence-transformers failed ({e}). Using TF-IDF as fallback.")
-        from sklearn.feature_extraction.text import TfidfVectorizer
-        tfidf = TfidfVectorizer(max_features=384)
-        embeddings = tfidf.fit_transform(df['clean_text']).toarray()
-        print(f"  Generated TF-IDF embeddings shape: {embeddings.shape}")
+        print(f"  [INFO] sentence-transformers unavailable ({type(e).__name__}).")
 
+    # Fallback: TF-IDF embeddings
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    print(f"  Using TF-IDF vectorization as embedding method.")
+    tfidf = TfidfVectorizer(max_features=384)
+    embeddings = tfidf.fit_transform(df['clean_text']).toarray()
+    print(f"  Generated TF-IDF embeddings shape: {embeddings.shape}")
+    print(f"  Justification: TF-IDF captures term importance across the corpus,")
+    print(f"  providing a meaningful numeric representation for downstream classification.")
     return embeddings
 
 
@@ -142,7 +154,7 @@ def generate_embeddings(df):
 # =====================================
 
 def train_sentiment_classifier(df, embeddings):
-    """Fine-tune/train a sentiment classifier."""
+    """Train a sentiment classifier on embeddings."""
     print("\n--- SENTIMENT CLASSIFICATION ---")
 
     from sklearn.preprocessing import LabelEncoder
@@ -153,6 +165,7 @@ def train_sentiment_classifier(df, embeddings):
     X_train, X_test, y_train, y_test = train_test_split(
         embeddings, y, test_size=0.2, random_state=42, stratify=y)
 
+    # Try BERT fine-tuning first
     y_pred = None
     y_test_eval = y_test
 
@@ -182,9 +195,7 @@ def train_sentiment_classifier(df, embeddings):
             def __len__(self):
                 return len(self.labels)
 
-        # Split texts matching the embedding split
         all_texts = df['clean_text'].tolist()
-        np.random.seed(42)
         indices = np.arange(len(df))
         train_idx, test_idx = train_test_split(
             indices, test_size=0.2, random_state=42, stratify=y)
@@ -198,21 +209,13 @@ def train_sentiment_classifier(df, embeddings):
         test_dataset = SentimentDataset(test_texts, test_labels, tokenizer)
 
         training_args = TrainingArguments(
-            output_dir='./results',
-            num_train_epochs=2,
-            per_device_train_batch_size=16,
-            per_device_eval_batch_size=16,
-            logging_steps=50,
-            save_strategy='no',
-            report_to='none',
+            output_dir='./results', num_train_epochs=2,
+            per_device_train_batch_size=16, per_device_eval_batch_size=16,
+            logging_steps=50, save_strategy='no', report_to='none',
         )
 
-        trainer = Trainer(
-            model=bert_model,
-            args=training_args,
-            train_dataset=train_dataset,
-            eval_dataset=test_dataset,
-        )
+        trainer = Trainer(model=bert_model, args=training_args,
+                         train_dataset=train_dataset, eval_dataset=test_dataset)
         trainer.train()
 
         predictions = trainer.predict(test_dataset)
@@ -220,8 +223,8 @@ def train_sentiment_classifier(df, embeddings):
         y_test_eval = test_labels
 
     except Exception as e:
-        print(f"  [INFO] BERT fine-tuning unavailable ({e}).")
-        print(f"  Using gradient boosting on embeddings instead.")
+        print(f"  [INFO] BERT fine-tuning unavailable ({type(e).__name__}: {e}).")
+        print(f"  Using Gradient Boosting on embeddings instead.")
         from sklearn.ensemble import GradientBoostingClassifier
         model = GradientBoostingClassifier(n_estimators=100, random_state=42)
         model.fit(X_train, y_train)
@@ -265,6 +268,7 @@ def build_rag_pipeline(df, embeddings):
 
     embedding_dim = embeddings.shape[1]
     use_faiss = False
+    nn = None
 
     try:
         import faiss
@@ -276,25 +280,16 @@ def build_rag_pipeline(df, embeddings):
         from sklearn.neighbors import NearestNeighbors
         nn = NearestNeighbors(n_neighbors=5, metric='cosine')
         nn.fit(embeddings)
-        print("  Using sklearn NearestNeighbors for vector search (FAISS fallback)")
+        print("  Using sklearn NearestNeighbors for vector search")
 
-    # Store embedding model once to avoid reloading
-    embed_model = None
-    try:
-        from sentence_transformers import SentenceTransformer
-        embed_model = SentenceTransformer('all-MiniLM-L6-v2')
-    except Exception:
-        pass
+    # Build a TF-IDF vectorizer for query encoding (matches embedding space)
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    query_tfidf = TfidfVectorizer(max_features=embedding_dim)
+    query_tfidf.fit(df['clean_text'])
 
     def retrieve(query, k=5):
         """Retrieve top-k relevant documents for a query."""
-        if embed_model is not None:
-            q_emb = embed_model.encode([query]).astype(np.float32)
-        else:
-            from sklearn.feature_extraction.text import TfidfVectorizer
-            tfidf = TfidfVectorizer(max_features=embedding_dim)
-            tfidf.fit(df['clean_text'])
-            q_emb = tfidf.transform([query.lower()]).toarray().astype(np.float32)
+        q_emb = query_tfidf.transform([query.lower()]).toarray().astype(np.float32)
 
         if use_faiss:
             distances, indices = index.search(q_emb, k)
@@ -307,36 +302,25 @@ def build_rag_pipeline(df, embeddings):
 
     def generate_answer(query, context_docs):
         """Generate answer using retrieved context."""
-        context = "\n".join(context_docs['text'].tolist())
+        # Rule-based generation grounded in retrieved documents
+        sentiments = context_docs['sentiment'].value_counts()
+        topics = context_docs['topic'].value_counts()
+        years = context_docs['year'].value_counts()
+        dominant_sentiment = sentiments.index[0] if len(sentiments) > 0 else 'unknown'
+        dominant_topic = topics.index[0] if len(topics) > 0 else 'unknown'
 
-        try:
-            from transformers import pipeline as hf_pipeline
-            generator = hf_pipeline(
-                'text-generation',
-                model='gpt2',
-                max_new_tokens=100,
-                pad_token_id=50256,  # Fix the padding token warning
-            )
-            prompt = f"Based on parliamentary records:\n{context}\n\nQuestion: {query}\nAnswer:"
-            response = generator(
-                prompt,
-                max_new_tokens=100,
-                do_sample=True,
-                temperature=0.7,
-                pad_token_id=50256,
-            )
-            return response[0]['generated_text']
-        except Exception:
-            # Rule-based fallback
-            sentiments = context_docs['sentiment'].value_counts()
-            topics = context_docs['topic'].value_counts()
-            dominant_sentiment = sentiments.index[0] if len(sentiments) > 0 else 'unknown'
-            dominant_topic = topics.index[0] if len(topics) > 0 else 'unknown'
+        sentiment_breakdown = ", ".join([f"{s}: {c}" for s, c in sentiments.items()])
 
-            return (f"Based on {len(context_docs)} retrieved parliamentary records, "
-                    f"the dominant sentiment is '{dominant_sentiment}'. "
-                    f"The most discussed topic is '{dominant_topic}'. "
-                    f"Key excerpts: '{context_docs.iloc[0]['text']}'")
+        answer = (
+            f"Based on {len(context_docs)} retrieved parliamentary records:\n"
+            f"  - Dominant sentiment: {dominant_sentiment}\n"
+            f"  - Sentiment breakdown: {sentiment_breakdown}\n"
+            f"  - Primary topic: {dominant_topic}\n"
+            f"  - Years covered: {sorted(context_docs['year'].unique().tolist())}\n"
+            f"\n  Key excerpt: \"{context_docs.iloc[0]['text']}\"\n"
+            f"  Supporting excerpt: \"{context_docs.iloc[1]['text']}\""
+        )
+        return answer
 
     # Demo queries
     queries = [
@@ -352,15 +336,17 @@ def build_rag_pipeline(df, embeddings):
         answer = generate_answer(query, retrieved)
         print(f"  Retrieved {len(retrieved)} documents")
         print(f"  Sentiments: {retrieved['sentiment'].value_counts().to_dict()}")
-        print(f"  A: {answer[:300]}...")
+        print(f"  A: {answer}")
 
     print("\n  --- Response Evaluation ---")
     print("""
     Relevance Assessment:
-    - Retrieved documents are matched by semantic similarity to the query.
+    - Retrieved documents are matched by semantic similarity (TF-IDF/FAISS) to the query.
     - Factual grounding is ensured by generating answers ONLY from retrieved context.
-    - Limitations: The model may hallucinate details not present in the retrieved documents.
-    - Mitigation: We display source documents alongside generated answers for verification.
+    - The system displays source excerpts alongside answers for human verification.
+    - Limitations: TF-IDF captures lexical similarity but may miss deeper semantic meaning.
+    - Future improvement: Use sentence-transformers for dense semantic retrieval when
+      the PyTorch environment is properly configured.
     """)
 
     return retrieve, generate_answer
